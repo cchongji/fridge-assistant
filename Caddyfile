@@ -1,0 +1,22 @@
+{
+	default_sni 115.159.95.183
+}
+
+https://115.159.95.183:18000 {
+	tls internal
+
+	root * /srv/h5
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy server:3300
+	}
+	handle /uploads/* {
+		reverse_proxy server:3300
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

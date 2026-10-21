@@ -1,0 +1,11 @@
+# 多阶段构建：容器内自动构建 uni-app H5，再用 Caddy 提供静态服务
+FROM node:20-slim AS build
+WORKDIR /app
+COPY miniprogram/package.json miniprogram/package-lock.json ./
+RUN npm ci
+COPY miniprogram/ .
+RUN npm run build:h5
+
+FROM caddy:2-alpine
+COPY --from=build /app/dist/build/h5 /srv/h5
+COPY Caddyfile /etc/caddy/Caddyfile

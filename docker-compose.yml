@@ -1,0 +1,28 @@
+services:
+  server:
+    build: ./server
+    restart: unless-stopped
+    env_file: ./server/.env
+    volumes:
+      - ./server/data:/app/data      # SQLite 数据持久化
+      - ./server/uploads:/app/uploads # 识别图片持久化
+    expose:
+      - "3300"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    ports:
+      - "18000:18000"                # HTTPS 服务端口（自签证书）
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+
+volumes:
+  caddy_data:
+  caddy_config:

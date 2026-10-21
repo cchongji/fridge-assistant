@@ -1,0 +1,41 @@
+{
+  "name": "冰箱剩余时间日历",
+  "appid": "",
+  "description": "拍照识别食品保质期，剩余时间日历与临期提醒",
+  "versionName": "0.1.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "app-plus": {
+    "usingComponents": true,
+    "nvueStyleCompiler": "uni-app"
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "requiredPrivateInfos": ["chooseImage"]
+  },
+  "h5": {
+    "title": "冰箱剩余时间日历",
+    "router": {
+      "mode": "hash"
+    },
+    "devServer": {
+      "port": 5180,
+      "proxy": {
+        "/api": {
+          "target": "http://localhost:3300",
+          "changeOrigin": true
+        }
+      }
+    }
+  },
+  "uniStatistics": {
+    "enable": false
+  },
+  "vueVersion": "3"
+}

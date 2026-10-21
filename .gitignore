@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+# 示例配置里含真实密钥，同样不入库
+.env.example
+*.env.local
+# 日志
+*.log
+logs/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.db
+*.db-wal
+*.db-shm
+server/uploads/
+server/data/
+.DS_Store
+# 部署产物（打包脚本会带上本地 .env，禁止入库）
+*.tgz
+# 页面抓取临时产物
+.playwright-cli/
