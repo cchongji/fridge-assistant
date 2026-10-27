@@ -71,6 +71,20 @@ H5 联调已验证通过的链路：登录 → 手动/模板录入 → 云端入
 4. 后端 `node-cron` 每小时扫描（临期3天/1天/当天/过期后，按用户配置），命中即发送并按 `push_log` 去重
 5. 未配置小程序凭证时自动跳过微信推送；配置 SMTP 后邮件兜底
 
+## 邮件提醒配置（H5 / 无微信授权时的兜底）
+
+1. `server/.env` 填 `SMTP_HOST`、`SMTP_PORT`（465 隐式 TLS / 587 STARTTLS）、`SMTP_USER`、`SMTP_PASS`
+   （QQ/163 邮箱需填**授权码**而非登录密码；可选 `SMTP_TO` 作为用户未绑定邮箱时的兜底收件人）
+2. 用户在"统计与设置 → 账号"填写提醒邮箱并保存（写入 `users.email`）；留空表示不接收邮件
+3. 用户在"统计与设置 → 邮件发送配置（SMTP）"可绑定自己的**发件邮箱 + SMTP 授权码**：
+   - 授权码按密码级别保护：服务端 AES-256-GCM 加密落库（`users.smtp_auth_enc`），接口只返回"是否已设置"，永不回显明文
+   - 发件邮箱留空时默认使用注册时绑定的邮箱；SMTP 服务器按邮箱域名自动推断（QQ/163/Gmail 等），也可沿用服务端 `SMTP_HOST`
+   - 未绑定授权码时自动回落到服务端 `SMTP_USER/SMTP_PASS`
+   - 加密密钥来自 `SECRET_ENC_KEY`（未设置则回落 `JWT_SECRET`），更换后已存授权码需重新绑定
+5. 改完 `.env` 必须重启服务：`docker compose up -d --build server`（env_file 只在启动时读取）
+6. "统计与设置"页点"发测试邮件"可验证 SMTP 是否可用；失败提示会直接带上 SMTP 报错原因
+7. 手动排查：`curl -X POST -H "Authorization: Bearer <token>" https://域名/api/remind/scan`
+
 ## 生产部署清单
 
 - [ ] 服务器部署 `server/`（Node 18+，`npm start`，建议 pm2 守护）

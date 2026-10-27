@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <NavBar title="添加食品" />
+
     <!-- 识别中 -->
     <view v-if="recognizing" class="recognizing">
       <view class="spinner" />
@@ -141,8 +143,9 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { api, request } from '../../utils/request.js'
+import { api } from '../../utils/request.js'
 import FoodSuggest from '../../components/FoodSuggest.vue'
+import NavBar from '../../components/NavBar.vue'
 
 const recognizing = ref(false)
 const saving = ref(false)
@@ -188,7 +191,11 @@ function chooseAndRecognize(source) {
 
 function recognizeImage(filePath) {
   recognizing.value = true
-  uni.getStorageSync('token') || request('/auth/dev-login', { method: 'POST' }).then(r => uni.setStorageSync('token', r.token))
+  if (!uni.getStorageSync('token')) {
+    recognizing.value = false
+    uni.reLaunch({ url: '/pages/login/index' })
+    return
+  }
   let baseUrl = '/api'
   // #ifndef H5
   baseUrl = 'http://localhost:3300/api'

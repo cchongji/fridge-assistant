@@ -1,5 +1,5 @@
 // 统一请求封装：H5 走代理 /api，小程序直连后端
-const BASE_URL = (() => {
+export const BASE_URL = (() => {
   // #ifdef H5
   return '/api'
   // #endif
@@ -7,6 +7,26 @@ const BASE_URL = (() => {
   return 'http://localhost:3300/api'
   // #endif
 })()
+
+const LOGIN_PAGE = '/pages/login/index'
+
+/** 清除登录态并跳转登录页 */
+export function goLogin() {
+  uni.removeStorageSync('token')
+  uni.removeStorageSync('user')
+  uni.reLaunch({ url: LOGIN_PAGE })
+}
+
+/** 退出登录 */
+export function logout() {
+  const token = uni.getStorageSync('token')
+  if (token) {
+    uni.request({ url: `${BASE_URL}/auth/logout`, method: 'POST', header: { Authorization: `Bearer ${token}` } })
+  }
+  goLogin()
+}
+
+const isAuthPath = p => p.startsWith('/auth/')
 
 export function request(path, { method = 'GET', data, header } = {}) {
   return new Promise((resolve, reject) => {
@@ -20,10 +40,10 @@ export function request(path, { method = 'GET', data, header } = {}) {
           resolve(res.data)
         } else {
           const msg = res.data?.error || `请求失败(${res.statusCode})`
-          if (res.statusCode === 401) {
-            // 登录态失效，重新登录
-            uni.removeStorageSync('token')
-            login().finally(() => reject(new Error(msg)))
+          // 认证接口自身返回 401 时保持在当前页，便于展示错误提示
+          if (res.statusCode === 401 && !isAuthPath(path)) {
+            goLogin()
+            reject(new Error('登录态失效，请重新登录'))
           } else {
             reject(new Error(msg))
           }
@@ -34,29 +54,12 @@ export function request(path, { method = 'GET', data, header } = {}) {
   })
 }
 
-/** 微信登录：code 换 JWT */
-export async function login() {
-  // #ifdef MP-WEIXIN
-  const { code } = await uni.login({ provider: 'weixin' })
-  const res = await request('/auth/login', { method: 'POST', data: { code } })
-  uni.setStorageSync('token', res.token)
-  return res.token
-  // #endif
-  // #ifndef H5
-  // #endif
-  // H5 调试用：游客模式，后端发 dev token
-  // #ifdef H5
-  const res = await request('/auth/dev-login', { method: 'POST' })
-  uni.setStorageSync('token', res.token)
-  return res.token
-  // #endif
-}
-
-/** 带鉴权的请求（自动补充 token，未登录自动登录） */
+/** 带鉴权的请求（自动补充 token） */
 export async function api(path, options = {}) {
-  let token = uni.getStorageSync('token')
+  const token = uni.getStorageSync('token')
   if (!token) {
-    token = await login()
+    goLogin()
+    throw new Error('请先登录')
   }
   return request(path, {
     ...options,

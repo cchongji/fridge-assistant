@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <NavBar title="过期日历" />
+
     <!-- 月份切换 -->
     <view class="month-bar">
       <text class="arrow" @tap="changeMonth(-1)">‹</text>
@@ -73,6 +75,7 @@ import { api } from '../../utils/request.js'
 import { freshness, FRESHNESS_COLOR } from '../../utils/date.js'
 import FoodCard from '../../components/FoodCard.vue'
 import TabBar from '../../components/TabBar.vue'
+import NavBar from '../../components/NavBar.vue'
 
 const weeks = ['日', '一', '二', '三', '四', '五', '六']
 const now = new Date()

@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <NavBar title="统计与设置" />
+
     <!-- 本月统计 -->
     <view class="card">
       <view class="card-title">本月统计（{{ stats.month }}）</view>
@@ -39,6 +41,36 @@
       <text class="hint" v-if="isWeixin">微信订阅消息为一次性授权，每次收到提醒后需重新授权</text>
     </view>
 
+    <!-- 账号 -->
+    <view class="card">
+      <view class="card-title">账号</view>
+      <view class="account-row">
+        <text class="account-name">{{ me.nickname || me.username || '未登录' }}</text>
+      </view>
+      <view class="account-email" v-if="me.username">
+        <text class="email-label">绑定邮箱</text>
+        <text class="email-value" :class="{ empty: !me.email }">{{ me.email || '未绑定' }}</text>
+      </view>
+      <input
+        v-if="me.username"
+        class="email-input"
+        type="text"
+        :value="emailDraft"
+        @input="onEmailInput"
+        placeholder="输入新邮箱，点击保存即可修改绑定邮箱"
+        placeholder-class="ph"
+        maxlength="64"
+        :adjust-position="true"
+      />
+      <view class="action-row">
+        <button class="act-btn ghost" @tap="saveEmail">💾 保存邮箱</button>
+        <button class="act-btn ghost" @tap="testEmail">📮 发测试邮件</button>
+      </view>
+      <text class="hint">
+        提醒邮件由服务端邮箱（switch_wula_cc_bx@163.com）发送到该邮箱；邮箱为空时不会发送任何邮件提醒
+      </text>
+    </view>
+
     <!-- 数据管理 -->
     <view class="card">
       <view class="card-title">数据管理</view>
@@ -56,10 +88,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { api } from '../../utils/request.js'
 import TabBar from '../../components/TabBar.vue'
+import NavBar from '../../components/NavBar.vue'
+
+const me = reactive({ username: '', nickname: '', email: '' })
+const emailDraft = ref('')
+
+const onEmailInput = e => {
+  emailDraft.value = e.detail.value
+}
 
 const stats = reactive({ month: '', eaten: 0, expired: 0, inStock: 0 })
 const remind = reactive({ d3: true, d1: true, d0: true, expired: true })
@@ -77,16 +117,22 @@ const isWeixin = ref(false)
 // #endif
 
 const pct = n => Math.min(100, (n / Math.max(stats.eaten + stats.expired, 1)) * 100) + '%'
+const emailValid = v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
 async function load() {
   try {
     Object.assign(stats, await api('/stats/monthly'))
     const s = await api('/settings')
     Object.assign(remind, s.remind)
+    const u = await api('/auth/me')
+    Object.assign(me, { username: u.username || '', nickname: u.nickname || '', email: u.email || '' })
+    emailDraft.value = me.email
   } catch (e) {
     uni.showToast({ title: e.message, icon: 'none' })
   }
 }
+
+
 
 async function toggleRemind(key, e) {
   remind[key] = e.detail.value
@@ -94,6 +140,31 @@ async function toggleRemind(key, e) {
     await api('/settings', { method: 'PUT', data: { remind: { ...remind } } })
   } catch (err) {
     uni.showToast({ title: err.message, icon: 'none' })
+  }
+}
+
+async function saveEmail() {
+  const email = String(emailDraft.value || '').trim()
+  if (!emailValid(email)) {
+    return uni.showToast({ title: '邮箱格式不正确', icon: 'none' })
+  }
+  try {
+    await api('/auth/me', { method: 'PUT', data: { email } })
+    me.email = email
+    emailDraft.value = email
+    uni.showToast({ title: email ? '邮箱已保存' : '已清除邮箱', icon: 'success' })
+  } catch (e) {
+    uni.showToast({ title: e.message, icon: 'none' })
+  }
+}
+
+async function testEmail() {
+  try {
+    const r = await api('/remind/test-email', { method: 'POST' })
+    uni.showToast({ title: `已发送至 ${r.to}`, icon: 'success' })
+  } catch (e) {
+    console.log(e.message)
+    uni.showToast({ title: e.message, icon: 'none', duration: 3000 })
   }
 }
 
@@ -262,6 +333,52 @@ onShow(load)
   &.ghost {
     background: $bg;
     color: $text-main;
+  }
+}
+.email-input {
+  width: 100%;
+  height: 88rpx;
+  box-sizing: border-box;
+  background: $bg;
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  font-size: 27rpx;
+  color: $text-main;
+}
+.account-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  .account-name {
+    font-size: 30rpx;
+    font-weight: 600;
+    color: $text-main;
+  }
+  .account-sub {
+    font-size: 24rpx;
+    color: $text-sub;
+  }
+}
+.account-email {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-bottom: 16rpx;
+  padding: 14rpx 20rpx;
+  background: $bg;
+  border-radius: 12rpx;
+  .email-label {
+    font-size: 24rpx;
+    color: $text-sub;
+    flex-shrink: 0;
+  }
+  .email-value {
+    font-size: 26rpx;
+    color: $text-main;
+    word-break: break-all;
+    &.empty {
+      color: $text-sub;
+    }
   }
 }
 </style>

@@ -1,8 +1,18 @@
 {
   "pages": [
     {
+      "path": "pages/login/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "登录",
+        "navigationBarBackgroundColor": "#EAFAF1",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
       "path": "pages/index/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "冰箱日历",
         "navigationBarBackgroundColor": "#F6F8F7",
         "navigationBarTextStyle": "black"
@@ -11,6 +21,7 @@
     {
       "path": "pages/calendar/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "过期日历",
         "navigationBarBackgroundColor": "#F6F8F7",
         "navigationBarTextStyle": "black"
@@ -19,6 +30,7 @@
     {
       "path": "pages/add/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "添加食品",
         "navigationBarBackgroundColor": "#F6F8F7",
         "navigationBarTextStyle": "black"
@@ -27,6 +39,7 @@
     {
       "path": "pages/detail/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "食品详情",
         "navigationBarBackgroundColor": "#F6F8F7",
         "navigationBarTextStyle": "black"
@@ -35,6 +48,7 @@
     {
       "path": "pages/stats/index",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "统计与设置",
         "navigationBarBackgroundColor": "#F6F8F7",
         "navigationBarTextStyle": "black"

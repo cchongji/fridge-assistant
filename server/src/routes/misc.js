@@ -2,6 +2,7 @@ import { Router } from 'express'
 import db from '../db.js'
 import { auth } from '../services/auth.js'
 import { scanAndPush } from '../services/reminder.js'
+import { sendEmail, resolveEmail, resolveSmtpConfig } from '../services/push.js'
 
 const router = Router()
 
@@ -28,6 +29,30 @@ router.post('/remind/scan', auth, async (req, res) => {
     res.json(await scanAndPush({ userId: req.uid }))
   } catch (e) {
     res.status(500).json({ error: e.message })
+  }
+})
+
+/** POST /api/remind/test-email  发送一封测试邮件，排查 SMTP/邮箱配置 */
+router.post('/remind/test-email', auth, async (req, res) => {
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.uid)
+    const to = resolveEmail(user)
+    const cfg = resolveSmtpConfig(req.uid)
+    if (!cfg) {
+      return res.status(400).json({
+        error: '未配置 SMTP：请先在统计页绑定发件邮箱与 SMTP 授权码，或由管理员配置 SMTP_HOST/SMTP_USER/SMTP_PASS'
+      })
+    }
+    if (!to) return res.status(400).json({ error: '未绑定提醒邮箱，请先在统计页填写邮箱' })
+    await sendEmail(
+      req.uid,
+      to,
+      '[冰箱日历] 测试邮件',
+      `这是一封测试邮件，收件人：${to}，发件账号：${cfg.auth.user}。收到即表示邮件提醒通道正常。`
+    )
+    res.json({ ok: true, to, from: cfg.auth.user })
+  } catch (e) {
+    res.status(500).json({ error: `邮件发送失败：${e.message}` })
   }
 })
 

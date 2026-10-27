@@ -1,5 +1,7 @@
 <template>
   <view class="page">
+    <NavBar title="冰箱日历" />
+
     <!-- 顶部统计条 -->
     <view class="stat-bar">
       <view class="stat-pill">
@@ -58,6 +60,7 @@ import { api } from '../../utils/request.js'
 import { daysLeft } from '../../utils/date.js'
 import FoodCard from '../../components/FoodCard.vue'
 import TabBar from '../../components/TabBar.vue'
+import NavBar from '../../components/NavBar.vue'
 
 const foods = ref([])
 const currentCate = ref('all')

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import db from '../db.js'
+import { hashPassword } from './password.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
 
@@ -19,32 +20,34 @@ export function auth(req, res, next) {
   }
 }
 
-/** code 换 openid 并确保用户存在，返回 user 行 */
-export async function upsertUserByCode(code) {
-  const appid = process.env.WX_APPID
-  const secret = process.env.WX_APPSECRET
-  if (!appid || !secret) throw new Error('服务端未配置 WX_APPID/WX_APPSECRET')
-  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appid}&secret=${secret}&js_code=${code}&grant_type=authorization_code`
-  const { data } = await axiosGet(url)
-  if (data.errcode) throw new Error(`微信登录失败: ${data.errcode} ${data.errmsg}`)
-  return upsertUserByOpenid(data.openid)
-}
+/**
+ * 启动时确保存在默认管理员账号
+ * 账号 admin，密码取 ADMIN_INIT_PASSWORD，默认 czy@1234
+ */
+export async function ensureDefaultAdmin() {
+  const DEFAULT_PASSWORD = process.env.ADMIN_INIT_PASSWORD || 'czy@1234'
+  const exist = db.prepare('SELECT id, username FROM users WHERE username = ?').get('admin')
+  if (exist) return exist
 
-export function upsertUserByOpenid(openid) {
-  let user = db.prepare('SELECT * FROM users WHERE openid = ?').get(openid)
-  if (!user) {
-    const info = db.prepare('INSERT INTO users(openid) VALUES (?)').run(openid)
-    user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid)
+  const hash = await hashPassword(DEFAULT_PASSWORD)
+
+  // 复用旧的 H5 游客账号，保留其食品数据与邮箱提醒配置
+  const legacy = db
+    .prepare("SELECT id FROM users WHERE openid = 'dev-user-h5' AND (username IS NULL OR username = '')")
+    .get()
+  if (legacy) {
+    db.prepare("UPDATE users SET username = 'admin', password_hash = ?, role = 'admin', nickname = COALESCE(NULLIF(nickname, ''), '管理员') WHERE id = ?").run(hash, legacy.id)
+    console.log('[auth] 已将原 H5 游客账号升级为 admin（食品与提醒配置保持不变）')
+    return db.prepare('SELECT id, username FROM users WHERE id = ?').get(legacy.id)
   }
-  return user
-}
 
-/** H5 联调用：固定游客账号 */
-export function getDevUser() {
-  return upsertUserByOpenid('dev-user-h5')
-}
-
-import axios from 'axios'
-function axiosGet(url) {
-  return axios.get(url, { timeout: 10000 })
+  const info = db
+    .prepare("INSERT INTO users (username, password_hash, nickname, role) VALUES (?, ?, '管理员', 'admin')")
+    .run('admin', hash)
+  db.prepare('INSERT OR IGNORE INTO settings (user_id, remind_config) VALUES (?, ?)').run(
+    info.lastInsertRowid,
+    JSON.stringify({ d3: true, d1: true, d0: true, expired: true })
+  )
+  console.log('[auth] 已初始化默认管理员：admin / ' + (process.env.ADMIN_INIT_PASSWORD ? '(自定义密码)' : 'czy@1234') + '（请登录后尽快修改）')
+  return db.prepare('SELECT id, username FROM users WHERE id = ?').get(info.lastInsertRowid)
 }

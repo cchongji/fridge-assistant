@@ -1,5 +1,7 @@
 <template>
   <view class="page" v-if="food">
+    <NavBar title="食品详情" />
+
     <!-- 倒计时卡片 -->
     <view class="hero" :style="{ background: heroBg }">
       <text class="hero-name">{{ food.name }}</text>
@@ -72,6 +74,7 @@ import { ref, computed, reactive } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { api } from '../../utils/request.js'
 import { daysLeftText, freshness, FRESHNESS_COLOR } from '../../utils/date.js'
+import NavBar from '../../components/NavBar.vue'
 
 const food = ref(null)
 const editing = ref(false)
