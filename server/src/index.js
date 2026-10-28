@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import './env.js' // 必须最先导入：先加载根目录 .env，再初始化读取 process.env 的模块
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'

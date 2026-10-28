@@ -8,10 +8,10 @@
 # 1. 上传整个项目到服务器（如 /opt/fridge-app），排除本地依赖目录
 #    rsync -av --exclude node_modules --exclude dist --exclude server/data ./ user@服务器:/opt/fridge-app/
 
-# 2. 服务器上准备配置
+# 2. 服务器上准备配置（.env 在项目根目录，前后端共用）
 cd /opt/fridge-app
-cp server/.env.example server/.env
-vim server/.env          # 改 JWT_SECRET；填 CODEBUDDY_API_KEY；WX/SMTP 按需（GLM_API_KEY 仅图片识别兜底，可留空）
+cp server/.env.example .env
+vim .env                 # 改 JWT_SECRET；填 CODEBUDDY_API_KEY；WX/SMTP 按需（GLM_API_KEY 仅图片识别兜底，可留空）
 
 # 3. 一键构建启动（首次约 3~5 分钟，含容器内 npm 构建 H5）
 docker compose up -d --build

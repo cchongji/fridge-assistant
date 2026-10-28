@@ -2,7 +2,7 @@ services:
   server:
     build: ./server
     restart: unless-stopped
-    env_file: ./server/.env
+    env_file: ./.env
     volumes:
       - ./server/data:/app/data      # SQLite 数据持久化
       - ./server/uploads:/app/uploads # 识别图片持久化

@@ -1,0 +1,23 @@
+{
+  "name": "fridge-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "冰箱剩余时间日历 —— 根目录统一开发入口（后端 server + 前端 miniprogram）",
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,green \"npm --prefix server run dev\" \"npm --prefix miniprogram run dev:h5\"",
+    "dev:server": "npm --prefix server run dev",
+    "dev:h5": "npm --prefix miniprogram run dev:h5",
+    "dev:mp": "npm --prefix miniprogram run dev:mp-weixin",
+    "build:h5": "npm --prefix miniprogram run build:h5",
+    "build:mp": "npm --prefix miniprogram run build:mp-weixin",
+    "e2e": "cd miniprogram && npx e2e run",
+    "e2e:prod": "cd miniprogram && cross-env E2E_ENV=production npx e2e run"
+  },
+  "engines": {
+    "node": ">=22.22.3"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5",
+    "cross-env": "^10.1.0"
+  }
+}
