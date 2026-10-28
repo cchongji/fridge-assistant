@@ -25,7 +25,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { request } from '../utils/request.js'
+import { api } from '../utils/request.js'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -50,8 +50,10 @@ function onInput(e) {
     return
   }
   timer = setTimeout(async () => {
+    // 联想是非关键请求：无 token 时直接跳过，避免把用户踢到登录页
+    if (!uni.getStorageSync('token')) return
     try {
-      const r = await request(`/foods/fuzzy?q=${encodeURIComponent(v.trim())}&category=${props.category}`)
+      const r = await api(`/foods/fuzzy?q=${encodeURIComponent(v.trim())}&category=${props.category}`)
       list.value = r.items || []
       showList.value = list.value.length > 0
     } catch (err) {
