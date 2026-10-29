@@ -37,15 +37,14 @@ router.post('/remind/test-email', auth, async (req, res) => {
   try {
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.uid)
     const to = resolveEmail(user)
-    const cfg = resolveSmtpConfig(req.uid)
+    const cfg = resolveSmtpConfig()
     if (!cfg) {
       return res.status(400).json({
-        error: '未配置 SMTP：请先在统计页绑定发件邮箱与 SMTP 授权码，或由管理员配置 SMTP_HOST/SMTP_USER/SMTP_PASS'
+        error: '未配置 SMTP：请由管理员配置服务端 SMTP_HOST/SMTP_USER/SMTP_PASS'
       })
     }
     if (!to) return res.status(400).json({ error: '未绑定提醒邮箱，请先在统计页填写邮箱' })
     await sendEmail(
-      req.uid,
       to,
       '[冰箱日历] 测试邮件',
       `这是一封测试邮件，收件人：${to}，发件账号：${cfg.auth.user}。收到即表示邮件提醒通道正常。`

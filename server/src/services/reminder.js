@@ -5,7 +5,7 @@ import {
   sendEmail,
   logPush,
   alreadyPushed,
-  smtpReadyFor,
+  smtpReady,
   resolveEmail,
   resolveSmtpConfig
 } from './push.js'
@@ -27,7 +27,7 @@ function remindTypesFor(daysLeft, config) {
 function channelsFor(user) {
   const list = []
   if (TEMPLATE_ID && user?.openid && !String(user.openid).startsWith('dev-')) list.push('weixin')
-  if (smtpReadyFor(user?.id) && resolveEmail(user)) list.push('email')
+  if (smtpReady() && resolveEmail(user)) list.push('email')
   return list
 }
 
@@ -36,7 +36,7 @@ function noChannelReason(user) {
   const missing = []
   if (!TEMPLATE_ID) missing.push('服务端未配置 WX_SUBSCRIBE_TEMPLATE_ID')
   else if (!user?.openid || String(user.openid).startsWith('dev-')) missing.push('当前账号未授权微信订阅消息')
-  if (!resolveSmtpConfig(user?.id)) missing.push('服务端未配置 SMTP（需管理员配置 SMTP_HOST/SMTP_USER/SMTP_PASS）')
+  if (!resolveSmtpConfig()) missing.push('服务端未配置 SMTP（需管理员配置 SMTP_HOST/SMTP_USER/SMTP_PASS）')
   else if (!resolveEmail(user)) missing.push('未绑定提醒邮箱（统计页 → 账号 → 邮箱）')
   return missing.join('；')
 }
@@ -90,7 +90,6 @@ export async function scanAndPush({ userId } = {}) {
             })
           } else {
             await sendEmail(
-              user.id,
               resolveEmail(user),
               `[冰箱日历] ${food.name} ${type === 'expired' ? '已过期' : '即将过期'}`,
               `食品「${food.name}」将于 ${food.expire_date} 过期（${

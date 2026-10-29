@@ -1,19 +1,28 @@
-import { runCodeBuddyPrompt } from './codebuddy-cli.js'
+import fs from 'fs'
+import path from 'path'
+import { runCodeBuddyVision } from './codebuddy-api.js'
 
-const PROMPT_TMPL = imagePath =>
-  `读取图片 ${imagePath}，这是一张食品包装/保质期标签的照片。只根据图片内容，寻找食品名称和生产日期/到期日期/保质期天数信息。` +
-  `如果图片中有多件食品，逐件列出。最后输出一个 JSON 对象（不要输出其他解释文字）：` +
-  `{"items":[{"name":"食品名称","productDate":"YYYY-MM-DD或null","expireDate":"YYYY-MM-DD或null","shelfLifeDays":数字或null,"quantity":数字或null,"confidence":0到1的小数}]}` +
-  `。不要修改任何文件，不要执行其他操作。`
+const PROMPT =
+  '这是一张食品包装/保质期标签的照片。只根据图片内容，寻找食品名称和生产日期/到期日期/保质期天数信息。' +
+  '如果图片中有多件食品，逐件列出。最后输出一个 JSON 对象（不要输出其他解释文字）：' +
+  '{"items":[{"name":"食品名称","productDate":"YYYY-MM-DD或null","expireDate":"YYYY-MM-DD或null","shelfLifeDays":数字或null,"quantity":数字或null,"confidence":0到1的小数}]}'
+
+const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' }
+
+/** 本地图片 → data URL（网关多模态输入） */
+function toDataUrl(imagePath) {
+  const mime = MIME[path.extname(imagePath).toLowerCase()] || 'image/jpeg'
+  return `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`
+}
 
 /**
- * CodeBuddy CLI 识别引擎：无头模式读图，返回结构化结果
+ * CodeBuddy 网关多模态识别引擎
  * @param {string} imagePath 图片绝对路径
  * @param {number} timeoutMs 超时（默认 120s）
  * @returns {Promise<{items: Array}>}
  */
 export function recognizeByCodeBuddy(imagePath, timeoutMs = 120000) {
-  return runCodeBuddyPrompt(PROMPT_TMPL(imagePath), timeoutMs).then(text => ({
+  return runCodeBuddyVision(toDataUrl(imagePath), PROMPT, timeoutMs).then(text => ({
     items: extractItems(text)
   }))
 }

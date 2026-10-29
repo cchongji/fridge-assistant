@@ -13,9 +13,7 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# CodeBuddy CLI：AI 保质期建议 / 图片识别主引擎（无头调用）
-# 放在 COPY src 之前，避免每次改源码都重装（约 5 分钟）
-RUN npm i -g @tencent-ai/codebuddy-code@2.167.0
+# AI 建议 / 图片识别：直连 CodeBuddy 网关（无需安装 CLI）
 
 # 源码
 COPY src ./src

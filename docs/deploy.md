@@ -34,13 +34,16 @@ npm run dev              # 后端 :3300 + 前端 :5181
 | --- | --- |
 | `PORT` | 后端端口，默认 3300 |
 | `JWT_SECRET` | 登录令牌密钥，生产必须替换 |
-| `CODEBUDDY_API_KEY` | CodeBuddy 网关 Key（AI 建议 / 图片识别 / e2e Agent） |
+| `CODEBUDDY_API_KEY` | CodeBuddy 网关 Key（AI 建议 / 拍照识别 / e2e Agent） |
 | `CODEBUDDY_BASE_URL` | 网关地址，默认 `https://www.codebuddy.cn/v2` |
+| `CODEBUDDY_MODEL` / `CODEBUDDY_VISION_MODEL` | 文本建议 / 图片识别模型，默认 `glm-5.3-flash` |
 | `GLM_API_KEY` / `GLM_VISION_MODEL` | 智谱视觉兜底（可选） |
-| `SMTP_HOST/PORT/USER/PASS` | 全局发件配置（用户未绑定自己的授权码时使用） |
+| `SMTP_HOST/PORT/USER/PASS` | 全局发件配置（邮件提醒统一使用该账号发信） |
 | `WX_APPID` / `WX_APPSECRET` / `WX_SUBSCRIBE_TEMPLATE_ID` | 微信订阅消息（Web 端不再使用，可留空） |
 
 > 后端由 `server/src/env.js` 加载根目录 `.env`；前端 Vite 通过 `envDir` 读取（仅暴露 `VITE_` 前缀）；e2e 用 `process.loadEnvFile` 读取。
+
+> AI 建议与拍照识别由后端直连 CodeBuddy 网关（OpenAI 兼容 `/chat/completions`，网关仅支持流式，服务端统一做 SSE 聚合），无需安装 codebuddy CLI。
 
 ## 三、构建
 
@@ -84,7 +87,7 @@ scp deploy.tgz root@<host>:/opt/fridge-app/
 ssh root@<host> "cd /opt/fridge-app && tar -xzf deploy.tgz && docker compose up -d --build"
 ```
 
-> 只改了前端时可 `docker compose up -d --build web`，避免重建 server 镜像（其内置 codebuddy CLI，重建较慢）。
+> 只改了前端时可 `docker compose up -d --build web`，避免重建 server 镜像。
 
 ## 六、E2E
 
@@ -100,8 +103,8 @@ npm run e2e:prod         # 线上（115.159.95.183:18000）
 
 ## 七、邮件提醒
 
-1. 用户注册时必须绑定邮箱（默认发件邮箱 = 注册邮箱）
-2. 在服务端 `.env` 配置全局 SMTP，或由用户在「统计与设置」页填写自己的 SMTP 授权码（加密存储）
+1. 用户注册时必须绑定邮箱（提醒邮件收件地址，可在「统计与设置」页修改）
+2. 在服务端 `.env` 配置全局 SMTP（`SMTP_HOST/PORT/USER/PASS`），用户无需填写授权码
 3. 后端 `node-cron` 每小时扫描：提前 3 天 / 1 天 / 当天 / 过期后持续提醒，按 `push_log` 去重
 4. 「统计与设置」页可发测试邮件、手动触发一次扫描排查
 

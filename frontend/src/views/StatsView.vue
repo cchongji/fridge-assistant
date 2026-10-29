@@ -18,7 +18,7 @@ import type { MeInfo, MonthlyStats, RemindConfig } from '@/api/types'
 
 const stats = reactive<MonthlyStats>({ month: '', eaten: 0, expired: 0, inStock: 0 })
 const remind = reactive<RemindConfig>({ d3: true, d1: true, d0: true, expired: true })
-const me = reactive<Partial<MeInfo>>({ username: '', nickname: '', email: '', smtpAuthSet: false })
+const me = reactive<Partial<MeInfo>>({ username: '', nickname: '', email: '' })
 const emailDraft = ref('')
 const loading = ref(false)
 const testing = ref(false)
@@ -197,13 +197,6 @@ onMounted(load)
         </div>
         <el-switch v-model="remind[opt.key]" @change="toggleRemind" />
       </div>
-
-      <el-alert
-        type="warning"
-        :closable="false"
-        class="mt-16"
-        title="Web 端不支持微信订阅消息，提醒通过邮件发送；需在下方绑定邮箱并配置 SMTP 授权码"
-      />
     </el-card>
 
     <el-card shadow="never" class="mb-16">
@@ -215,11 +208,6 @@ onMounted(load)
           <el-tag v-if="me.username" size="small" type="info" effect="plain" class="ml-8">{{ me.username }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="绑定邮箱">{{ me.email || '未绑定' }}</el-descriptions-item>
-        <el-descriptions-item label="SMTP 授权码">
-          <el-tag :type="me.smtpAuthSet ? 'success' : 'info'" size="small" effect="plain">
-            {{ me.smtpAuthSet ? '已配置' : '未配置' }}
-          </el-tag>
-        </el-descriptions-item>
       </el-descriptions>
 
       <div class="email-row mt-16">

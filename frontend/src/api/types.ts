@@ -40,8 +40,6 @@ export interface MeInfo {
   nickname: string
   email: string
   role: string
-  smtpEmail: string
-  smtpAuthSet: boolean
 }
 
 export interface Captcha {
@@ -87,13 +85,6 @@ export interface RemindConfig {
   d1: boolean
   d0: boolean
   expired: boolean
-}
-
-export interface SmtpConfig {
-  email: string
-  smtpEmail: string
-  defaultEmail: string
-  authSet: boolean
 }
 
 export interface MonthlyStats {

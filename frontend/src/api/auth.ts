@@ -1,5 +1,5 @@
 import { BASE_URL, get, post, put } from './http'
-import type { Captcha, LoginResult, MeInfo, SmtpConfig } from './types'
+import type { Captcha, LoginResult, MeInfo } from './types'
 
 export const fetchCaptcha = () => get<Captcha>('/auth/captcha')
 
@@ -28,11 +28,6 @@ export const fetchMe = () => get<MeInfo>('/auth/me')
 
 export const updateMe = (payload: { nickname?: string; email?: string }) =>
   put<{ ok: boolean }>('/auth/me', payload)
-
-export const fetchSmtp = () => get<SmtpConfig>('/auth/smtp')
-
-export const updateSmtp = (payload: { email?: string; authCode?: string; clearAuth?: boolean }) =>
-  put<{ ok: boolean; email: string; authSet: boolean }>('/auth/smtp', payload)
 
 export const changePassword = (payload: { oldPassword: string; password: string; confirm: string }) =>
   put<{ ok: boolean }>('/auth/password', payload)
