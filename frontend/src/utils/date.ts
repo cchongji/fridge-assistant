@@ -54,3 +54,37 @@ export function addDays(n: number): string {
   d.setDate(d.getDate() + n)
   return toDateString(d)
 }
+
+export type ShelfLifeUnit = 'day' | 'month' | 'year'
+
+/** 保质期上限（按单位） */
+export const SHELF_MAX: Record<ShelfLifeUnit, number> = { day: 3650, month: 120, year: 10 }
+
+/** 解析基准日期：支持 YYYY-MM-DD / YYYY/MM/DD / YYYY年MM月DD日，缺省为今天 */
+function parseBaseDate(base?: string | Date | null): Date {
+  if (base instanceof Date) return new Date(base.getFullYear(), base.getMonth(), base.getDate())
+  const m = String(base || '').match(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/)
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3])
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+/**
+ * 基准日期 + 保质期（天 / 月 / 年），不传基准日期则以今天计算
+ * 月末自动收敛：如 1 月 31 日 + 1 个月 → 2 月最后一天
+ */
+export function addShelfLife(amount: number, unit: ShelfLifeUnit, base?: string | Date | null): string {
+  const d = parseBaseDate(base)
+  const n = Math.max(1, Math.round(amount))
+  if (unit === 'day') {
+    d.setDate(d.getDate() + n)
+  } else {
+    const months = unit === 'year' ? n * 12 : n
+    const day = d.getDate()
+    d.setDate(1) // 先归到 1 号，避免 setMonth 溢出到下个月
+    d.setMonth(d.getMonth() + months)
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    d.setDate(Math.min(day, lastDay))
+  }
+  return toDateString(d)
+}

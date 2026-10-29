@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
@@ -8,7 +8,8 @@ import FoodSuggest from '@/components/FoodSuggest.vue'
 import { createFood, createFoods, suggestFood } from '@/api/foods'
 import { recognizeImage } from '@/api/recognize'
 import type { Category, FoodPayload, FuzzyItem } from '@/api/types'
-import { addDays, toDateString } from '@/utils/date'
+import { addDays, addShelfLife, toDateString, SHELF_MAX } from '@/utils/date'
+import type { ShelfLifeUnit } from '@/utils/date'
 
 const router = useRouter()
 
@@ -68,8 +69,12 @@ interface ConfirmItem {
   name: string
   category: Category
   quantity: number
+  productDate: string
   expireDate: string
   confidence?: number
+  estimated?: boolean
+  shelfAmount?: number
+  shelfUnit: ShelfLifeUnit
 }
 const confirmItems = ref<ConfirmItem[]>([])
 
@@ -84,8 +89,16 @@ async function onFileChange(file: UploadFile) {
       name: it.name,
       category: it.category || 'refrigerated',
       quantity: it.quantity || 1,
-      expireDate: it.expireDate || addDays(it.days || 7),
-      confidence: it.confidence
+      productDate: it.productDate || '',
+      // 过期日期缺失时，优先按「生产日期 + 保质期天数」推算
+      expireDate:
+        it.expireDate ||
+        (it.productDate && it.shelfLifeDays ? addShelfLife(it.shelfLifeDays, 'day', it.productDate) : addDays(it.days || 7)),
+      confidence: it.confidence,
+      estimated: it.estimated === true,
+      // 识别到（或 AI 建议）的保质期天数，预填到快捷保质期
+      shelfAmount: it.shelfLifeDays && it.shelfLifeDays > 0 ? it.shelfLifeDays : undefined,
+      shelfUnit: 'day' as ShelfLifeUnit
     }))
     if (!confirmItems.value.length) {
       ElMessage.warning('未识别出食品，请手动录入')
@@ -102,6 +115,16 @@ async function onFileChange(file: UploadFile) {
 function onConfirmSelect(item: ConfirmItem, s: FuzzyItem) {
   item.category = s.category
   item.expireDate = addDays(s.days)
+}
+
+/** 确认弹窗内：输入快捷保质期后，按「生产日期 + 保质期」自动算出过期日期 */
+function recalcExpire(item: ConfirmItem) {
+  const amount = Number(item.shelfAmount)
+  if (!Number.isFinite(amount) || amount <= 0) return
+  // 切换单位后原数量可能超出上限，按当前单位收敛
+  const n = Math.min(Math.round(amount), SHELF_MAX[item.shelfUnit])
+  if (n !== amount) item.shelfAmount = n
+  item.expireDate = addShelfLife(n, item.shelfUnit, item.productDate)
 }
 
 async function saveAll() {
@@ -141,6 +164,20 @@ const manual = reactive({
 const suggesting = ref(false)
 const suggestTip = ref('')
 const manualSaving = ref(false)
+
+/* 自定义保质期：数量 + 单位（天/月/年） */
+const shelfAmount = ref<number>()
+const shelfUnit = ref<ShelfLifeUnit>('day')
+const SHELF_UNIT_LABEL: Record<ShelfLifeUnit, string> = { day: '天', month: '个月', year: '年' }
+const shelfMax = computed(() => SHELF_MAX[shelfUnit.value])
+
+function applyShelfLife() {
+  const amount = Number(shelfAmount.value)
+  if (!Number.isFinite(amount) || amount <= 0) return ElMessage.warning('请输入大于 0 的保质期')
+  const n = Math.min(Math.round(amount), SHELF_MAX[shelfUnit.value])
+  manual.expireDate = addShelfLife(n, shelfUnit.value)
+  suggestTip.value = `按保质期 ${n} ${SHELF_UNIT_LABEL[shelfUnit.value]}计算：有效期至 ${manual.expireDate}`
+}
 
 function onManualSelect(s: FuzzyItem) {
   manual.category = s.category
@@ -187,6 +224,8 @@ async function saveManual() {
 
 function resetManual() {
   Object.assign(manual, { name: '', category: 'refrigerated', quantity: 1, expireDate: '' })
+  shelfAmount.value = undefined
+  shelfUnit.value = 'day'
   suggestTip.value = ''
 }
 </script>
@@ -296,16 +335,36 @@ function resetManual() {
         </el-form-item>
 
         <el-form-item label="快捷保质期">
-          <div class="flex-center" style="flex-wrap: wrap">
-            <el-tag
-              v-for="d in [3, 7, 14, 30, 90, 180]"
-              :key="d"
-              class="day-chip"
-              effect="plain"
-              @click="manual.expireDate = addDays(d)"
-            >
-              {{ d }} 天
-            </el-tag>
+          <div class="shelf-block">
+            <div class="shelf-chips">
+              <el-tag
+                v-for="d in [3, 7, 14, 30, 90, 180]"
+                :key="d"
+                class="day-chip"
+                effect="plain"
+                @click="manual.expireDate = addDays(d)"
+              >
+                {{ d }} 天
+              </el-tag>
+            </div>
+            <div class="shelf-custom">
+              <el-input-number
+                v-model="shelfAmount"
+                :min="1"
+                :max="shelfMax"
+                :step="1"
+                controls-position="right"
+                placeholder="自定义保质期"
+                style="width: 140px"
+                @keyup.enter="applyShelfLife"
+              />
+              <el-select v-model="shelfUnit" style="width: 92px">
+                <el-option label="天" value="day" />
+                <el-option label="月" value="month" />
+                <el-option label="年" value="year" />
+              </el-select>
+              <el-button @click="applyShelfLife">计算过期日</el-button>
+            </div>
           </div>
         </el-form-item>
 
@@ -327,13 +386,26 @@ function resetManual() {
         <template #header>
           <div class="flex-between">
             <span>第 {{ idx + 1 }} 件</span>
-            <el-tag v-if="(item.confidence ?? 1) < 0.6" type="warning" size="small">置信度低，请核对</el-tag>
+            <div class="flex-center" style="gap: 8px">
+              <el-tag v-if="item.estimated" type="success" size="small" effect="plain">AI 建议保质期</el-tag>
+              <el-tag v-if="(item.confidence ?? 1) < 0.6" type="warning" size="small">置信度低，请核对</el-tag>
+            </div>
           </div>
         </template>
 
-        <el-form label-width="76px" label-position="left">
+        <el-form label-width="92px" label-position="left">
           <el-form-item label="名称">
             <FoodSuggest v-model="item.name" :category="item.category" @select="s => onConfirmSelect(item, s)" />
+          </el-form-item>
+          <el-form-item label="生产日期">
+            <el-date-picker
+              v-model="item.productDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="未识别到生产日期"
+              style="width: 200px"
+              @change="recalcExpire(item)"
+            />
           </el-form-item>
           <el-form-item label="过期日期">
             <el-date-picker
@@ -343,6 +415,33 @@ function resetManual() {
               style="width: 200px"
               :class="{ 'is-low-conf': (item.confidence ?? 1) < 0.6 }"
             />
+          </el-form-item>
+          <el-form-item label="快捷保质期">
+            <div class="shelf-custom">
+              <el-input-number
+                v-model="item.shelfAmount"
+                :min="1"
+                :max="SHELF_MAX[item.shelfUnit]"
+                :step="1"
+                controls-position="right"
+                placeholder="填写保质期"
+                style="width: 140px"
+                @change="recalcExpire(item)"
+                @keyup.enter="recalcExpire(item)"
+              />
+              <el-select v-model="item.shelfUnit" style="width: 92px" @change="recalcExpire(item)">
+                <el-option label="天" value="day" />
+                <el-option label="月" value="month" />
+                <el-option label="年" value="year" />
+              </el-select>
+              <span class="text-muted">
+                {{
+                  item.estimated
+                    ? '图片未识别到保质期，已按食品种类给出建议值'
+                    : '按生产日期自动计算过期日期'
+                }}
+              </span>
+            </div>
           </el-form-item>
           <el-row :gutter="16">
             <el-col :span="12">
@@ -414,9 +513,28 @@ function resetManual() {
   width: 100%;
 }
 
+.shelf-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.shelf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shelf-custom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .day-chip {
   cursor: pointer;
-  margin-right: 8px;
 }
 
 .confirm-item {

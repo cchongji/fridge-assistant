@@ -68,7 +68,10 @@ export interface RecognizeItem {
   unit?: string
   days?: number
   shelfLifeDays?: number
+  productDate?: string | null
   expireDate?: string
+  /** 图片中无明确保质期，shelfLifeDays 为 AI 依据食品种类给出的建议值 */
+  estimated?: boolean
   note?: string
   confidence?: number
 }

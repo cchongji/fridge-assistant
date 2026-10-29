@@ -30,6 +30,7 @@ const expireMap = computed(() => {
 })
 
 const selectedStr = computed(() => toDateString(selectedDate.value))
+const todayStr = computed(() => toDateString(new Date()))
 
 const selectedFoods = computed(() =>
   (expireMap.value.get(selectedStr.value) || []).filter(
@@ -51,7 +52,24 @@ function dotsOf(dateStr: string) {
   return [...seen.values()].slice(0, 4)
 }
 
-const cellKey = (date: Date) => toDateString(date)
+/** 某天仍未吃完的食品数量（含已过期与即将过期） */
+function pendingCount(dateStr: string) {
+  return (expireMap.value.get(dateStr) || []).filter(f => f.status !== 'eaten').length
+}
+
+/** 某天仍未吃完、且日期已过去的食品数量（已过期） */
+function expiredCount(dateStr: string) {
+  return dateStr < todayStr.value ? pendingCount(dateStr) : 0
+}
+
+function cellClass(dateStr: string) {
+  const pending = pendingCount(dateStr)
+  return {
+    'is-today': dateStr === todayStr.value,
+    'has-expired': expiredCount(dateStr) > 0,
+    'has-upcoming': pending > 0 && !expiredCount(dateStr)
+  }
+}
 
 async function load() {
   loading.value = true
@@ -76,6 +94,8 @@ onMounted(load)
       </div>
       <div class="legend">
         <span class="legend__item"><i class="legend__dot" :style="{ background: '#22c55e' }" />在库（按新鲜度配色）</span>
+        <span class="legend__item"><i class="legend__dot" :style="{ background: '#ef4444' }" />已过期</span>
+        <span class="legend__item"><i class="legend__dot legend__dot--today" />今天</span>
         <span class="legend__item"><i class="legend__dot legend__dot--eaten" />已吃完</span>
       </div>
     </div>
@@ -83,11 +103,16 @@ onMounted(load)
     <el-card v-loading="loading" shadow="never">
       <el-calendar v-model="selectedDate">
         <template #date-cell="{ data }">
-          <div class="cell" :class="{ 'is-today': cellKey(data.date) === cellKey(new Date()) }">
+          <div class="cell" :class="cellClass(data.day)">
             <span class="cell__day">{{ data.day.split('-')[2] }}</span>
+            <span v-if="data.day === todayStr" class="cell__badge cell__badge--today">今天</span>
+            <span v-else-if="expiredCount(data.day)" class="cell__badge">{{ expiredCount(data.day) }}</span>
+            <span v-else-if="pendingCount(data.day)" class="cell__badge cell__badge--upcoming">
+              {{ pendingCount(data.day) }}
+            </span>
             <span class="cell__dots">
               <i
-                v-for="(d, i) in dotsOf(cellKey(data.date))"
+                v-for="(d, i) in dotsOf(data.day)"
                 :key="i"
                 class="cell__dot"
                 :class="{ 'cell__dot--eaten': d.eaten }"
@@ -147,12 +172,18 @@ onMounted(load)
   display: inline-block;
 }
 
+.legend__dot--today {
+  background: var(--el-color-primary);
+  box-shadow: 0 0 0 2px var(--el-color-primary-light-7);
+}
+
 .legend__dot--eaten {
   background: transparent;
   border: 1.5px solid var(--el-border-color-darker);
 }
 
 .cell {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -169,17 +200,85 @@ onMounted(load)
 .cell.is-today .cell__day {
   color: var(--el-color-primary);
   font-weight: 700;
+  font-size: 15px;
+}
+
+.cell.has-expired .cell__day {
+  color: var(--el-color-danger);
+  font-weight: 700;
+}
+
+/* 今天 / 过期件数角标 */
+.cell__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--el-color-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.cell__badge--today {
+  background: var(--el-color-primary);
+  font-size: 10px;
+}
+
+.cell__badge--upcoming {
+  background: var(--el-color-primary);
+  font-size: 10px;
+}
+
+/* 整格底色：用伪元素铺满单元格，避免只靠小圆点难以辨识 */
+.cell::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  z-index: 0;
+  border-radius: 8px;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* 有食品、尚未过期（含今天）：主色系底色 */
+.cell.has-upcoming::before {
+  background: var(--el-color-primary-light-9);
+  box-shadow: inset 0 0 0 1.5px var(--el-color-primary-light-7);
+}
+
+/* 今天：更强的主色描边 */
+.cell.is-today::before {
+  background: var(--el-color-primary-light-9);
+  box-shadow: inset 0 0 0 2px var(--el-color-primary);
+}
+
+/* 已过期：红色底色 + 红色描边 */
+.cell.has-expired::before {
+  background: var(--el-color-danger-light-9);
+  box-shadow: inset 0 0 0 1.5px var(--el-color-danger-light-5);
+}
+
+.cell > span {
+  position: relative;
+  z-index: 1;
 }
 
 .cell__dots {
   display: flex;
-  gap: 3px;
-  height: 6px;
+  align-items: center;
+  gap: 4px;
+  height: 8px;
 }
 
 .cell__dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   display: inline-block;
 }
@@ -216,6 +315,18 @@ onMounted(load)
   :deep(.el-calendar-table .el-calendar-day) {
     height: 44px;
     padding: 2px;
+  }
+
+  .cell::before {
+    inset: -2px;
+  }
+
+  .cell__badge {
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 15px;
   }
 }
 </style>
