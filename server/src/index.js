@@ -3,6 +3,7 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
+import adminRoutes from './routes/admin.js'
 import foodRoutes from './routes/foods.js'
 import recognizeRoutes from './routes/recognize.js'
 import miscRoutes from './routes/misc.js'
@@ -31,6 +32,7 @@ app.use((req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')))
 
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', adminRoutes)
 app.use('/api/foods', foodRoutes)
 app.use('/api/recognize', recognizeRoutes)
 app.use('/api', miscRoutes)

@@ -2,21 +2,30 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { Calendar, DataLine, Food, House, Plus, SwitchButton, User } from '@element-plus/icons-vue'
+import { Calendar, DataLine, Food, House, Key, Plus, SwitchButton, User, UserFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const tabs = [
+const businessTabs = [
   { name: 'home', path: '/', label: '冰箱', icon: House },
   { name: 'calendar', path: '/calendar', label: '日历', icon: Calendar },
   { name: 'add', path: '/add', label: '添加', icon: Plus },
   { name: 'stats', path: '/stats', label: '统计', icon: DataLine }
 ]
 
-const activeTab = computed(() => (route.meta.tab as string) || 'home')
+// 管理员使用独立的账号管理入口，不展示业务菜单
+const adminTabs = [{ name: 'admin', path: '/admin', label: '账号管理', icon: UserFilled }]
+
+const tabs = computed(() => (userStore.isAdmin ? adminTabs : businessTabs))
+
+const activeTab = computed(() => (route.meta.tab as string) || (userStore.isAdmin ? 'admin' : 'home'))
+
+function goHome() {
+  router.push(userStore.isAdmin ? '/admin' : '/')
+}
 
 async function onCommand(cmd: string) {
   if (cmd === 'logout') {
@@ -26,6 +35,7 @@ async function onCommand(cmd: string) {
     return
   }
   if (cmd === 'stats') router.push('/stats')
+  if (cmd === 'password') router.push('/change-password')
 }
 </script>
 
@@ -33,7 +43,7 @@ async function onCommand(cmd: string) {
   <div class="layout">
     <header class="layout__header">
       <div class="layout__inner">
-        <div class="layout__brand" @click="router.push('/')">
+        <div class="layout__brand" @click="goHome">
           <el-icon class="layout__logo" :size="20" color="var(--el-color-primary)"><Food /></el-icon>
           <span class="layout__name">冰箱剩余时间</span>
         </div>
@@ -58,7 +68,8 @@ async function onCommand(cmd: string) {
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="stats">账号与提醒设置</el-dropdown-item>
+              <el-dropdown-item v-if="!userStore.isAdmin" command="stats">账号与提醒设置</el-dropdown-item>
+              <el-dropdown-item command="password" :icon="Key">修改密码</el-dropdown-item>
               <el-dropdown-item command="logout" divided :icon="SwitchButton">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -70,7 +81,7 @@ async function onCommand(cmd: string) {
       <router-view />
     </main>
 
-    <nav class="layout__tabbar">
+    <nav class="layout__tabbar" :style="{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }">
       <router-link v-for="t in tabs" :key="t.name" :to="t.path" class="layout__tab" :class="{ active: activeTab === t.name }">
         <el-icon :size="20"><component :is="t.icon" /></el-icon>
         <span>{{ t.label }}</span>

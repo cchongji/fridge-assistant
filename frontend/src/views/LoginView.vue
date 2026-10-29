@@ -102,8 +102,10 @@ async function submit() {
       await userStore.login(form.username, form.password)
     }
     ElMessage.success(isReg ? '注册成功' : '登录成功')
-    const redirect = (route.query.redirect as string) || '/'
-    router.replace(redirect)
+    // 管理员登录后进入账号管理页，普通用户进入冰箱首页
+    const home = userStore.isAdmin ? '/admin' : '/'
+    const redirect = (route.query.redirect as string) || home
+    router.replace(userStore.isAdmin ? home : redirect)
   } catch (e) {
     error.value = (e as Error).message || '操作失败'
     if (isReg) {

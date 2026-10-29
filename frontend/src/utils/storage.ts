@@ -3,8 +3,12 @@ const USER_KEY = 'user'
 
 export interface StoredUser {
   id?: number
+  uid?: number
   username?: string
+  nickname?: string
   email?: string
+  role?: string
+  mustChangePassword?: boolean
   subscribe?: boolean
   [k: string]: unknown
 }

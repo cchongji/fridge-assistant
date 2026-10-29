@@ -11,15 +11,29 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!token.value)
   const nickname = computed(() => (user.value?.nickname as string) || (user.value?.username as string) || '')
+  const isAdmin = computed(() => user.value?.role === 'admin')
 
   function restore() {
     token.value = getToken()
     user.value = getUser()
   }
 
-  function applyAuth(res: { token: string; uid: number; username: string; nickname: string }) {
+  function applyAuth(res: {
+    token: string
+    uid: number
+    username: string
+    nickname: string
+    role?: string
+    mustChangePassword?: boolean
+  }) {
     token.value = res.token
-    const profile: StoredUser = { uid: res.uid, username: res.username, nickname: res.nickname }
+    const profile: StoredUser = {
+      uid: res.uid,
+      username: res.username,
+      nickname: res.nickname,
+      role: res.role || 'user',
+      mustChangePassword: res.mustChangePassword === true
+    }
     user.value = profile
     setToken(res.token)
     setUser(profile)
@@ -48,5 +62,5 @@ export const useUserStore = defineStore('user', () => {
     clear()
   }
 
-  return { token, user, isLoggedIn, nickname, restore, login, register, clear, logout }
+  return { token, user, isLoggedIn, isAdmin, nickname, restore, login, register, clear, logout }
 })

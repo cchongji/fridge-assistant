@@ -53,6 +53,19 @@ CREATE TABLE IF NOT EXISTS push_log (
   sent_at TEXT DEFAULT (datetime('now', 'localtime')),
   UNIQUE(user_id, food_id, remind_type, channel)
 );
+
+-- 管理员敏感操作审计
+CREATE TABLE IF NOT EXISTS admin_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_id INTEGER NOT NULL,
+  admin_username TEXT DEFAULT '',
+  action TEXT NOT NULL,                           -- reset_password / disable / enable
+  target_id INTEGER,
+  target_username TEXT DEFAULT '',
+  detail TEXT DEFAULT '',
+  ip TEXT DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now', 'localtime'))
+);
 `)
 
 // ---- 轻量迁移：账号密码登录所需字段 ----
@@ -60,6 +73,9 @@ const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name)
 if (!userCols.includes('username')) db.exec('ALTER TABLE users ADD COLUMN username TEXT')
 if (!userCols.includes('password_hash')) db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT')
 if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
+if (!userCols.includes('status')) db.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'") // active/disabled
+if (!userCols.includes('token_version')) db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0') // 自增即强制下线
+if (!userCols.includes('must_change_password')) db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0') // 管理员重置密码后强制改密
 // 账号唯一（允许微信等遗留账号为空）
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL AND username <> \'\'')
 

@@ -31,6 +31,9 @@ export interface LoginResult {
   token: string
   uid: number
   username: string
+  role: string
+  /** 管理员重置密码后为 true，需先修改密码才能使用其他功能 */
+  mustChangePassword?: boolean
   nickname: string
 }
 
@@ -95,4 +98,16 @@ export interface MonthlyStats {
   eaten: number
   expired: number
   inStock: number
+}
+
+export interface AdminUser {
+  id: number
+  username: string
+  nickname: string
+  email: string
+  role: string
+  status: string
+  created_at: string
+  food_count: number
+  stock_count: number
 }

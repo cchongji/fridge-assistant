@@ -75,8 +75,14 @@ router.post('/register', async (req, res) => {
       JSON.stringify({ d3: true, d1: true, d0: true, expired: true })
     )
 
-    const user = db.prepare('SELECT id, username, nickname FROM users WHERE id = ?').get(info.lastInsertRowid)
-    res.json({ token: signToken(user.id), uid: user.id, username: user.username, nickname: user.nickname })
+    const user = db.prepare('SELECT id, username, nickname, role FROM users WHERE id = ?').get(info.lastInsertRowid)
+    res.json({
+      token: signToken(user.id),
+      uid: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      role: user.role || 'user'
+    })
   } catch (e) {
     res.status(500).json({ error: e.message || '注册失败' })
   }
@@ -98,9 +104,18 @@ router.post('/login', async (req, res) => {
     const ok = user?.password_hash ? await verifyPassword(String(body.password ?? ''), user.password_hash) : false
     // 账号不存在时也返回同一提示，避免账号枚举
     if (!ok) return res.status(401).json({ error: '账号或密码错误' })
+    // 密码正确后再提示停用，避免通过提示枚举账号状态
+    if (user.status === 'disabled') return res.status(403).json({ error: '账号已停用，请联系管理员' })
 
     reset(`login:${ip}:${username}`)
-    res.json({ token: signToken(user.id), uid: user.id, username: user.username, nickname: user.nickname })
+    res.json({
+      token: signToken(user.id, user.token_version || 0),
+      uid: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      role: user.role || 'user',
+      mustChangePassword: !!user.must_change_password
+    })
   } catch (e) {
     res.status(500).json({ error: e.message || '登录失败' })
   }
@@ -111,14 +126,17 @@ router.post('/logout', (req, res) => res.json({ ok: true }))
 
 /** GET /api/auth/me */
 router.get('/me', auth, (req, res) => {
-  const user = db.prepare('SELECT id, username, nickname, email, role FROM users WHERE id = ?').get(req.uid)
+  const user = db
+    .prepare('SELECT id, username, nickname, email, role, must_change_password FROM users WHERE id = ?')
+    .get(req.uid)
   if (!user) return res.status(404).json({ error: '用户不存在' })
   res.json({
     id: user.id,
     username: user.username,
     nickname: user.nickname,
     email: user.email,
-    role: user.role
+    role: user.role,
+    mustChangePassword: !!user.must_change_password
   })
 })
 
@@ -155,9 +173,14 @@ router.put('/password', auth, async (req, res) => {
     if (!pw.ok) return res.status(400).json({ error: pw.msg })
     if (String(password) !== String(confirm ?? '')) return res.status(400).json({ error: '两次输入的密码不一致' })
 
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(await hashPassword(String(password)), req.uid)
+    // 自增 token_version，使其他设备上的旧令牌立即失效；同时返回新令牌给当前端继续使用
+    // must_change_password 归零：完成强制改密后解除接口限制
+    const ver = (user.token_version || 0) + 1
+    db.prepare(
+      'UPDATE users SET password_hash = ?, token_version = ?, must_change_password = 0 WHERE id = ?'
+    ).run(await hashPassword(String(password)), ver, req.uid)
     reset(`pwd:${req.uid}`)
-    res.json({ ok: true })
+    res.json({ ok: true, token: signToken(req.uid, ver) })
   } catch (e) {
     res.status(500).json({ error: e.message || '修改密码失败' })
   }

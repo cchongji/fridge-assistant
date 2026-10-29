@@ -30,6 +30,6 @@ export const updateMe = (payload: { nickname?: string; email?: string }) =>
   put<{ ok: boolean }>('/auth/me', payload)
 
 export const changePassword = (payload: { oldPassword: string; password: string; confirm: string }) =>
-  put<{ ok: boolean }>('/auth/password', payload)
+  put<{ ok: boolean; token?: string }>('/auth/password', payload)
 
 export const logoutApi = () => post<{ ok: boolean }>('/auth/logout')
