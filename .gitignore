@@ -20,5 +20,7 @@ server/data/
 *.tgz
 # 页面抓取临时产物
 .playwright-cli/
+# 根目录页面截图（开发临时产物）
+/*.png
 # e2e 运行产物
 frontend/.e2e/
