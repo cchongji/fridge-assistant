@@ -37,9 +37,7 @@ npm run dev              # 后端 :3300 + 前端 :5181
 | `CODEBUDDY_API_KEY` | CodeBuddy 网关 Key（AI 建议 / 拍照识别 / e2e Agent） |
 | `CODEBUDDY_BASE_URL` | 网关地址，默认 `https://www.codebuddy.cn/v2` |
 | `CODEBUDDY_MODEL` / `CODEBUDDY_VISION_MODEL` | 文本建议 / 图片识别模型，默认 `glm-5.3-flash` |
-| `GLM_API_KEY` / `GLM_VISION_MODEL` | 智谱视觉兜底（可选） |
 | `SMTP_HOST/PORT/USER/PASS` | 全局发件配置（邮件提醒统一使用该账号发信） |
-| `WX_APPID` / `WX_APPSECRET` / `WX_SUBSCRIBE_TEMPLATE_ID` | 微信订阅消息（Web 端不再使用，可留空） |
 
 > 后端由 `server/src/env.js` 加载根目录 `.env`；前端 Vite 通过 `envDir` 读取（仅暴露 `VITE_` 前缀）；e2e 用 `process.loadEnvFile` 读取。
 

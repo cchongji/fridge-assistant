@@ -79,7 +79,7 @@ async function onFileChange(file: UploadFile) {
   recognizing.value = true
   try {
     const data = await recognizeImage(raw)
-    engine.value = data.engine === 'codebuddy' ? 'CodeBuddy 视觉' : '智谱视觉'
+    engine.value = 'CodeBuddy 视觉'
     confirmItems.value = (data.items || []).map(it => ({
       name: it.name,
       category: it.category || 'refrigerated',

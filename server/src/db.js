@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS push_log (
   user_id INTEGER NOT NULL,
   food_id INTEGER NOT NULL,
   remind_type TEXT NOT NULL,                      -- d3/d1/d0/expired
-  channel TEXT NOT NULL,                          -- weixin/email
+  channel TEXT NOT NULL,                          -- email
   ok INTEGER NOT NULL,
   sent_at TEXT DEFAULT (datetime('now', 'localtime')),
   UNIQUE(user_id, food_id, remind_type, channel)
