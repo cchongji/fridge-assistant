@@ -1,0 +1,123 @@
+/* ------------------------------------------------------------------
+ * 全局样式：沿用 Element Plus 设计语言（蓝主色 / 卡片 / 8px 圆角）
+ * 覆盖少量 EP 变量，把整体调得更"轻"一些，适合冰箱清单这类工具
+ * ------------------------------------------------------------------ */
+:root {
+  --app-max-width: 1080px;
+  --app-header-h: 60px;
+  --app-gap: 16px;
+  --el-border-radius-base: 8px;
+  --el-color-primary: #409eff;
+  --el-font-size-base: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  background-color: var(--el-bg-color-page, #f5f7fa);
+  color: var(--el-text-color-primary, #303133);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 页面容器 */
+.app-page {
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: var(--app-gap);
+}
+
+.app-page__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: var(--app-gap);
+  flex-wrap: wrap;
+}
+
+.app-page__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-page__desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 卡片统一细节 */
+.el-card {
+  --el-card-padding: 16px;
+  border-radius: 8px;
+}
+
+.el-card__header {
+  font-weight: 600;
+}
+
+/* 通用工具类 */
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.text-muted {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.mt-8 {
+  margin-top: 8px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+/* 移动端：底部导航占位，避免内容被遮挡 */
+@media (max-width: 767px) {
+  .app-page {
+    padding: 12px 12px calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .app-page__title {
+    font-size: 16px;
+  }
+
+  .el-card {
+    --el-card-padding: 12px;
+  }
+}

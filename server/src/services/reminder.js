@@ -1,16 +1,7 @@
 import cron from 'node-cron'
 import db from '../db.js'
-import {
-  sendWxSubscribe,
-  sendEmail,
-  logPush,
-  alreadyPushed,
-  smtpReadyFor,
-  resolveEmail,
-  resolveSmtpConfig
-} from './push.js'
+import { sendEmail, logPush, alreadyPushed, smtpReady, resolveEmail, resolveSmtpConfig } from './push.js'
 
-const TEMPLATE_ID = (process.env.WX_SUBSCRIBE_TEMPLATE_ID || '').trim()
 const DEFAULT_CONFIG = { d3: true, d1: true, d0: true, expired: true }
 
 function remindTypesFor(daysLeft, config) {
@@ -23,20 +14,17 @@ function remindTypesFor(daysLeft, config) {
   return types
 }
 
-/** 该用户可用的推送渠道（H5 游客 openid 无法发订阅消息） */
+/** 该用户可用的推送渠道（仅邮件） */
 function channelsFor(user) {
   const list = []
-  if (TEMPLATE_ID && user?.openid && !String(user.openid).startsWith('dev-')) list.push('weixin')
-  if (smtpReadyFor(user?.id) && resolveEmail(user)) list.push('email')
+  if (smtpReady() && resolveEmail(user)) list.push('email')
   return list
 }
 
 /** 无可用渠道时，给出具体缺什么（便于用户自查） */
 function noChannelReason(user) {
   const missing = []
-  if (!TEMPLATE_ID) missing.push('服务端未配置 WX_SUBSCRIBE_TEMPLATE_ID')
-  else if (!user?.openid || String(user.openid).startsWith('dev-')) missing.push('当前账号未授权微信订阅消息')
-  if (!resolveSmtpConfig(user?.id)) missing.push('服务端未配置 SMTP（需管理员配置 SMTP_HOST/SMTP_USER/SMTP_PASS）')
+  if (!resolveSmtpConfig()) missing.push('服务端未配置 SMTP（需管理员配置 SMTP_HOST/SMTP_USER/SMTP_PASS）')
   else if (!resolveEmail(user)) missing.push('未绑定提醒邮箱（统计页 → 账号 → 邮箱）')
   return missing.join('；')
 }
@@ -82,28 +70,19 @@ export async function scanAndPush({ userId } = {}) {
 
       for (const ch of todo) {
         try {
-          if (ch === 'weixin') {
-            await sendWxSubscribe(user.openid, TEMPLATE_ID, {
-              name: food.name,
-              expireDate: food.expire_date,
-              daysLeft
-            })
-          } else {
-            await sendEmail(
-              user.id,
-              resolveEmail(user),
-              `[冰箱日历] ${food.name} ${type === 'expired' ? '已过期' : '即将过期'}`,
-              `食品「${food.name}」将于 ${food.expire_date} 过期（${
-                daysLeft < 0 ? '已过期 ' + -daysLeft + ' 天' : '还剩 ' + daysLeft + ' 天'
-              }），请尽快处理。`
-            )
-          }
+          await sendEmail(
+            resolveEmail(user),
+            `[冰箱日历] ${food.name} ${type === 'expired' ? '已过期' : '即将过期'}`,
+            `食品「${food.name}」将于 ${food.expire_date} 过期（${
+              daysLeft < 0 ? '已过期 ' + -daysLeft + ' 天' : '还剩 ' + daysLeft + ' 天'
+            }），请尽快处理。`
+          )
           logPush(user.id, food.id, type, ch, true)
           result.sent++
         } catch (e) {
-          console.warn(`[remind] ${ch} 发送失败(${food.name}):`, e.message)
+          console.warn(`[remind] 邮件发送失败(${food.name}):`, e.message)
           logPush(user.id, food.id, type, ch, false)
-          result.skipped.push({ name: food.name, type, reason: `${ch === 'weixin' ? '微信' : '邮件'}发送失败：${e.message}` })
+          result.skipped.push({ name: food.name, type, reason: `邮件发送失败：${e.message}` })
         }
       }
     }

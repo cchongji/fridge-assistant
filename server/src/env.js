@@ -19,4 +19,8 @@ if (found) {
   console.warn('[env] 未找到 .env，且 JWT_SECRET 未通过环境变量注入')
 }
 
+if (!process.env.JWT_SECRET) {
+  console.warn('[env] 未配置 JWT_SECRET，令牌签名回退为 dev-secret（仅限本地开发，生产务必设置）')
+}
+
 export const envFile = found || null

@@ -30,7 +30,9 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
   const imagePath = req.file.path
   try {
     const result = await recognize(imagePath)
-    res.json({ ...result, imageUrl: `/uploads/${req.file.filename}` })
+    // 识别成功即删除本地原图，避免临时文件堆积（失败时保留以便排查）
+    await fs.promises.unlink(imagePath).catch(() => {})
+    res.json(result)
   } catch (e) {
     res.status(502).json({ error: `识别失败：${e.message}` })
   }

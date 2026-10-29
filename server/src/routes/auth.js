@@ -5,7 +5,6 @@ import { hashPassword, verifyPassword } from '../services/password.js'
 import { hit, reset } from '../services/rate-limit.js'
 import { createCaptcha, verifyCaptcha, getCaptchaSvg } from '../services/captcha.js'
 import { USERNAME_RE, sanitizeText, isValidEmail, checkPassword } from '../services/validate.js'
-import { encryptSecret } from '../services/secret.js'
 
 const router = Router()
 
@@ -69,8 +68,8 @@ router.post('/register', async (req, res) => {
     const hash = await hashPassword(String(body.password))
     const nickname = sanitizeText(body.nickname || username, 20)
     const info = db
-      .prepare('INSERT INTO users (username, password_hash, nickname, email, smtp_email) VALUES (?, ?, ?, ?, ?)')
-      .run(username, hash, nickname, email, email) // 默认发件邮箱 = 注册时绑定的邮箱
+      .prepare('INSERT INTO users (username, password_hash, nickname, email) VALUES (?, ?, ?, ?)')
+      .run(username, hash, nickname, email)
     db.prepare('INSERT OR IGNORE INTO settings (user_id, remind_config) VALUES (?, ?)').run(
       info.lastInsertRowid,
       JSON.stringify({ d3: true, d1: true, d0: true, expired: true })
@@ -112,18 +111,14 @@ router.post('/logout', (req, res) => res.json({ ok: true }))
 
 /** GET /api/auth/me */
 router.get('/me', auth, (req, res) => {
-  const user = db
-    .prepare('SELECT id, username, nickname, email, role, smtp_email, smtp_auth_enc FROM users WHERE id = ?')
-    .get(req.uid)
+  const user = db.prepare('SELECT id, username, nickname, email, role FROM users WHERE id = ?').get(req.uid)
   if (!user) return res.status(404).json({ error: '用户不存在' })
   res.json({
     id: user.id,
     username: user.username,
     nickname: user.nickname,
     email: user.email,
-    role: user.role,
-    smtpEmail: user.smtp_email || '',
-    smtpAuthSet: !!user.smtp_auth_enc // 授权码只回传"是否已设置"，绝不明文返回
+    role: user.role
   })
 })
 
@@ -133,59 +128,14 @@ router.put('/me', auth, (req, res) => {
   if (email !== undefined && email !== '' && !isValidEmail(email)) {
     return res.status(400).json({ error: '邮箱格式不正确' })
   }
-  const cur = db.prepare('SELECT email, smtp_email FROM users WHERE id = ?').get(req.uid)
   const nextEmail = email === undefined ? null : String(email).trim().slice(0, 64)
-  // 用户未自定义发件邮箱时，发件邮箱默认跟随注册邮箱一起变更
-  let smtpEmail = cur?.smtp_email || ''
-  if (email !== undefined && (!smtpEmail || smtpEmail === (cur?.email || ''))) smtpEmail = nextEmail || ''
 
-  db.prepare(
-    'UPDATE users SET nickname = COALESCE(?, nickname), email = COALESCE(?, email), smtp_email = ? WHERE id = ?'
-  ).run(nickname === undefined ? null : sanitizeText(nickname, 20), nextEmail, smtpEmail, req.uid)
+  db.prepare('UPDATE users SET nickname = COALESCE(?, nickname), email = COALESCE(?, email) WHERE id = ?').run(
+    nickname === undefined ? null : sanitizeText(nickname, 20),
+    nextEmail,
+    req.uid
+  )
   res.json({ ok: true })
-})
-
-/** GET /api/auth/smtp  查看邮件推送绑定（授权码不明文返回） */
-router.get('/smtp', auth, (req, res) => {
-  const row = db.prepare('SELECT email, smtp_email, smtp_auth_enc FROM users WHERE id = ?').get(req.uid)
-  if (!row) return res.status(404).json({ error: '用户不存在' })
-  res.json({
-    email: row.email || '', // 注册时绑定的邮箱
-    smtpEmail: row.smtp_email || '', // 自定义发件邮箱（空 = 跟随注册邮箱）
-    defaultEmail: row.smtp_email || row.email || '', // 实际生效的发件邮箱
-    authSet: !!row.smtp_auth_enc
-  })
-})
-
-/** PUT /api/auth/smtp  绑定发件邮箱 + SMTP 授权码（授权码加密存储，与密码同等保护） */
-router.put('/smtp', auth, (req, res) => {
-  const { email, authCode, clearAuth } = req.body || {}
-  const row = db.prepare('SELECT email, smtp_email, smtp_auth_enc FROM users WHERE id = ?').get(req.uid)
-  if (!row) return res.status(404).json({ error: '用户不存在' })
-
-  const rl = hit(`smtp:${req.uid}`, 10, TEN_MIN)
-  if (!rl.ok) return tooFast(res, rl.retryAfter, '修改邮件配置')
-
-  // 发件邮箱：留空或与注册邮箱相同 → 视为"默认"，落库为空以便自动跟随注册邮箱
-  let smtpEmail = row.smtp_email || ''
-  if (email !== undefined) {
-    const v = String(email).trim().slice(0, 64)
-    if (v && !isValidEmail(v)) return res.status(400).json({ error: '邮箱格式不正确' })
-    smtpEmail = v && v !== (row.email || '') ? v : ''
-  }
-
-  // 授权码：空串表示不修改；clearAuth 表示清除；其余加密后落库
-  let enc = row.smtp_auth_enc || ''
-  if (clearAuth === true) {
-    enc = ''
-  } else if (authCode !== undefined && String(authCode).trim() !== '') {
-    const code = String(authCode).trim()
-    if (code.length < 4 || code.length > 128) return res.status(400).json({ error: 'SMTP 授权码长度需在 4-128 位之间' })
-    enc = encryptSecret(code)
-  }
-
-  db.prepare('UPDATE users SET smtp_email = ?, smtp_auth_enc = ? WHERE id = ?').run(smtpEmail, enc, req.uid)
-  res.json({ ok: true, email: smtpEmail || row.email || '', authSet: !!enc })
 })
 
 /** PUT /api/auth/password  修改密码（需原密码） */

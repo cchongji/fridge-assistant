@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS push_log (
   user_id INTEGER NOT NULL,
   food_id INTEGER NOT NULL,
   remind_type TEXT NOT NULL,                      -- d3/d1/d0/expired
-  channel TEXT NOT NULL,                          -- weixin/email
+  channel TEXT NOT NULL,                          -- email
   ok INTEGER NOT NULL,
   sent_at TEXT DEFAULT (datetime('now', 'localtime')),
   UNIQUE(user_id, food_id, remind_type, channel)
@@ -62,11 +62,5 @@ if (!userCols.includes('password_hash')) db.exec('ALTER TABLE users ADD COLUMN p
 if (!userCols.includes('role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
 // 账号唯一（允许微信等遗留账号为空）
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL AND username <> \'\'')
-
-// ---- 迁移：SMTP 绑定（发件邮箱 + 授权码密文，授权码不明文存储） ----
-if (!userCols.includes('smtp_email')) db.exec('ALTER TABLE users ADD COLUMN smtp_email TEXT')
-if (!userCols.includes('smtp_auth_enc')) db.exec('ALTER TABLE users ADD COLUMN smtp_auth_enc TEXT')
-// 默认发件邮箱 = 注册时绑定的邮箱
-db.exec("UPDATE users SET smtp_email = email WHERE (smtp_email IS NULL OR smtp_email = '') AND email IS NOT NULL AND email <> ''")
 
 export default db
