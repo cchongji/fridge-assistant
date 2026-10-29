@@ -1,101 +1,116 @@
-# 冰箱剩余时间日历 — 联调与部署指引
+# 联调与部署指南
 
-## 方式一：Docker 部署（Debian 13 服务器，推荐）
+> 架构：`frontend/`（Vite + Vue3 + Element Plus，构建为静态资源） + `server/`（Express + SQLite），
+> 线上由 Caddy 托管静态资源并反向代理 `/api` → 后端 3300。
 
-仓库已含 `docker-compose.yml`、`Dockerfile.web`（容器内自动构建 H5）、`server/Dockerfile`、`Caddyfile`。
+## 一、本地联调
 
 ```bash
-# 1. 上传整个项目到服务器（如 /opt/fridge-app），排除本地依赖目录
-#    rsync -av --exclude node_modules --exclude dist --exclude server/data ./ user@服务器:/opt/fridge-app/
-
-# 2. 服务器上准备配置（.env 在项目根目录，前后端共用）
-cd /opt/fridge-app
+# 1. 环境变量（项目根目录，前后端共用）
 cp server/.env.example .env
-vim .env                 # 改 JWT_SECRET；填 CODEBUDDY_API_KEY；WX/SMTP 按需（GLM_API_KEY 仅图片识别兜底，可留空）
+vim .env                 # JWT_SECRET / CODEBUDDY_API_KEY / SMTP 等
 
-# 3. 一键构建启动（首次约 3~5 分钟，含容器内 npm 构建 H5）
+# 2. 依赖
+npm install              # 根目录（concurrently）
+npm --prefix server install
+npm --prefix frontend install
+
+# 3. 一键启动
+npm run dev              # 后端 :3300 + 前端 :5181
+```
+
+| 服务 | 地址 | 单独启动 |
+| --- | --- | --- |
+| 后端 API | http://localhost:3300 | `npm run dev:server` |
+| 前端 | http://localhost:5181 | `npm run dev:web` |
+
+前端 vite 已配置 `/api` → `http://localhost:3300` 代理，无需处理跨域。
+
+已验证链路：登录 → 拍照识别/模板/手动录入 → 入库 → 首页倒计时 → 日历标记 → 详情编辑 → 统计与提醒设置。
+
+## 二、环境变量（根目录 `.env`）
+
+| 变量 | 说明 |
+| --- | --- |
+| `PORT` | 后端端口，默认 3300 |
+| `JWT_SECRET` | 登录令牌密钥，生产必须替换 |
+| `CODEBUDDY_API_KEY` | CodeBuddy 网关 Key（AI 建议 / 图片识别 / e2e Agent） |
+| `CODEBUDDY_BASE_URL` | 网关地址，默认 `https://www.codebuddy.cn/v2` |
+| `GLM_API_KEY` / `GLM_VISION_MODEL` | 智谱视觉兜底（可选） |
+| `SMTP_HOST/PORT/USER/PASS` | 全局发件配置（用户未绑定自己的授权码时使用） |
+| `WX_APPID` / `WX_APPSECRET` / `WX_SUBSCRIBE_TEMPLATE_ID` | 微信订阅消息（Web 端不再使用，可留空） |
+
+> 后端由 `server/src/env.js` 加载根目录 `.env`；前端 Vite 通过 `envDir` 读取（仅暴露 `VITE_` 前缀）；e2e 用 `process.loadEnvFile` 读取。
+
+## 三、构建
+
+```bash
+npm run build:web        # 产物 frontend/dist（含 vue-tsc 类型检查）
+npm run typecheck        # 仅类型检查
+```
+
+## 四、服务器部署（Docker Compose）
+
+```bash
+# 1. 首次准备
+ssh root@<host>
+mkdir -p /opt/fridge-app && cd /opt/fridge-app
+
+# 2. 配置（放根目录，供 server 容器注入环境变量）
+cp server/.env.example .env
+vim .env
+
+# 3. 启动
 docker compose up -d --build
 
 # 4. 验证
-curl http://服务器IP/api/health
-# 浏览器打开 http://服务器IP
+curl -k https://<host>:18000/api/health
 ```
 
-**启用 HTTPS（有域名）**：编辑 `Caddyfile`，把 `:80` 改成你的域名（如 `fridge.example.com`），并删除 `auto_https off` 行，然后：
+`docker-compose.yml` 要点：
+
+- `server`：Node 镜像，`env_file: ./.env`，数据卷挂载 `server/data`（SQLite）与 `server/uploads`
+- `web`：`Dockerfile.web` 多阶段构建 `frontend/`，产物交给 Caddy
+- `Caddyfile`：静态资源 + `/api/*` 反代 `server:3300`
+
+## 五、日常更新发布
 
 ```bash
-docker compose up -d && docker compose restart web
-# Caddy 自动向 Let's Encrypt 申请并续期证书（需域名 A 记录已指向服务器，放行 80/443）
+# 本地打包（排除敏感与体积目录）
+tar -czf deploy.tgz --exclude=node_modules --exclude=dist --exclude=.git \
+  --exclude=.env --exclude=server/data --exclude=server/uploads --exclude=.e2e .
+
+scp deploy.tgz root@<host>:/opt/fridge-app/
+ssh root@<host> "cd /opt/fridge-app && tar -xzf deploy.tgz && docker compose up -d --build"
 ```
 
-**数据备份**（都挂载在宿主机，容器删除不丢）：
+> 只改了前端时可 `docker compose up -d --build web`，避免重建 server 镜像（其内置 codebuddy CLI，重建较慢）。
+
+## 六、E2E
 
 ```bash
-0 3 * * * cp /opt/fridge-app/server/data/fridge.db /opt/backup/fridge-$(date +\%F).db
+npm run dev              # 先起服务
+npm run e2e              # 本地（frontend:5181）
+npm run e2e:prod         # 线上（115.159.95.183:18000）
 ```
 
-**更新版本**：
+- 用例位于 `frontend/tests/`，配置 `frontend/e2e.config.ts`
+- Agent 用例依赖 `CODEBUDDY_API_KEY`；模型网关仅支持流式，配置里已做 SSE 聚合适配
+- 线上为自签证书，若浏览器拒绝，可把 Caddy 根证书导入本机信任库：`certutil -addstore -f Root caddy-root.crt`
 
-```bash
-git pull   # 或重新上传代码
-docker compose up -d --build
-```
+## 七、邮件提醒
 
-## 方式二：传统部署（pm2 + Nginx）
+1. 用户注册时必须绑定邮箱（默认发件邮箱 = 注册邮箱）
+2. 在服务端 `.env` 配置全局 SMTP，或由用户在「统计与设置」页填写自己的 SMTP 授权码（加密存储）
+3. 后端 `node-cron` 每小时扫描：提前 3 天 / 1 天 / 当天 / 过期后持续提醒，按 `push_log` 去重
+4. 「统计与设置」页可发测试邮件、手动触发一次扫描排查
 
-## 当前开发环境（本机已就绪）
+## 八、上线检查清单
 
-| 服务 | 地址 | 启动命令 |
-| --- | --- | --- |
-| 后端 API | http://localhost:3300 | `cd server && npm run dev` |
-| H5 预览 | http://localhost:5180 | `cd miniprogram && npm run dev:h5` |
-| 小程序构建产物 | `miniprogram/dist/dev/mp-weixin` | `npm run dev:mp-weixin` |
-
-H5 联调已验证通过的链路：登录 → 手动/模板录入 → 云端入库 → 首页倒计时列表 → 日历标记 → 统计。
-图片识别（CodeBuddy CLI 主引擎 + 智谱兜底）已通过单接口冒烟（置信度 0.98）。
-
-## 微信真机联调步骤
-
-1. **注册小程序**：mp.weixin.qq.com 注册，获取 AppID/AppSecret，填入 `server/.env` 的 `WX_APPID`/`WX_APPSECRET`
-2. **安装微信开发者工具**，导入 `miniprogram` 项目，同时把 AppID 填入 `miniprogram/src/manifest.json` 的 `mp-weixin.appid`
-3. **关闭合法域名校验**：开发者工具 → 详情 → 本地设置 → 勾选"不校验合法域名、web-view（业务域名）、TLS 版本以及 HTTPS 证书"
-4. `npm run dev:mp-weixin` 后用开发者工具打开 `dist/dev/mp-weixin`
-5. 手机预览：开发者工具点"预览"扫码（手机与电脑需同一局域网，且小程序端 baseUrl 需改为电脑局域网 IP，见 `src/utils/request.js` 的非 H5 分支）
-
-## 订阅消息推送配置
-
-1. 小程序后台（mp.weixin.qq.com）→ 功能 → 订阅消息 → 申请"一次性订阅"模板
-   模板字段需包含：食品名称(thing)、过期日期(date)、剩余天数(number)、状态(thing)
-2. 把模板 ID 填入 `server/.env` 的 `WX_SUBSCRIBE_TEMPLATE_ID`
-3. 小程序端"统计与设置"页点"开启微信提醒"完成 `wx.requestSubscribeMessage` 授权
-4. 后端 `node-cron` 每小时扫描（临期3天/1天/当天/过期后，按用户配置），命中即发送并按 `push_log` 去重
-5. 未配置小程序凭证时自动跳过微信推送；配置 SMTP 后邮件兜底
-
-## 邮件提醒配置（H5 / 无微信授权时的兜底）
-
-1. `server/.env` 填 `SMTP_HOST`、`SMTP_PORT`（465 隐式 TLS / 587 STARTTLS）、`SMTP_USER`、`SMTP_PASS`
-   （QQ/163 邮箱需填**授权码**而非登录密码；可选 `SMTP_TO` 作为用户未绑定邮箱时的兜底收件人）
-2. 用户在"统计与设置 → 账号"填写提醒邮箱并保存（写入 `users.email`）；留空表示不接收邮件
-3. 用户在"统计与设置 → 邮件发送配置（SMTP）"可绑定自己的**发件邮箱 + SMTP 授权码**：
-   - 授权码按密码级别保护：服务端 AES-256-GCM 加密落库（`users.smtp_auth_enc`），接口只返回"是否已设置"，永不回显明文
-   - 发件邮箱留空时默认使用注册时绑定的邮箱；SMTP 服务器按邮箱域名自动推断（QQ/163/Gmail 等），也可沿用服务端 `SMTP_HOST`
-   - 未绑定授权码时自动回落到服务端 `SMTP_USER/SMTP_PASS`
-   - 加密密钥来自 `SECRET_ENC_KEY`（未设置则回落 `JWT_SECRET`），更换后已存授权码需重新绑定
-5. 改完 `.env` 必须重启服务：`docker compose up -d --build server`（env_file 只在启动时读取）
-6. "统计与设置"页点"发测试邮件"可验证 SMTP 是否可用；失败提示会直接带上 SMTP 报错原因
-7. 手动排查：`curl -X POST -H "Authorization: Bearer <token>" https://域名/api/remind/scan`
-
-## 生产部署清单
-
-- [ ] 服务器部署 `server/`（Node 18+，`npm start`，建议 pm2 守护）
-- [ ] HTTPS + ICP 备案域名指向后端，Nginx 反代 3300
-- [ ] 小程序后台配置 request 合法域名：`https://你的域名`
-- [ ] `miniprogram/src/utils/request.js` 非 H5 分支的 baseUrl 改为生产域名
-- [ ] `.env` 替换生产 JWT_SECRET，确认 AppSecret/SMTP 凭证
-- [ ] 小程序提交审核（类目建议：工具 > 效率）
-
-## 已知限制
-
-- CLI 识别单次 10~30 秒，后端已设 120s 超时 + 智谱 glm-4v-flash 自动降级
-- 订阅消息为一次性授权，每次推送后需用户重新授权（可在收到提醒后回到设置页续订）
-- `ck_` API Key 当前为明文存于 `server/.env`（已 gitignore），建议定期轮换
+- [ ] `.env` 中 `JWT_SECRET` 已替换为强随机值
+- [ ] `CODEBUDDY_API_KEY` 有效（发一次 AI 建议验证）
+- [ ] SMTP 配置可用（发测试邮件成功）
+- [ ] `docker compose ps` 两容器均为 Up
+- [ ] `https://<host>:18000/api/health` 返回 `{"status":"ok"}`
+- [ ] 前端强刷后登录、录入、日历、统计全链路正常
+- [ ] 备份 `server/data/*.db` 与 `server/uploads`
